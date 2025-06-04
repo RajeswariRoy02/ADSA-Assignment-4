@@ -1,89 +1,86 @@
 #include <iostream>
-#include <string>
-#include <algorithm>
 #include <vector>
+#include <limits>
+#include <string>
+#include <sstream>
 
 using namespace std;
 
-// Convert a character to integer value
-int charToValue(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 10;
-    return 0;
+const int INF = numeric_limits<int>::max();
+
+int charToCost(char c) {
+    if ('A' <= c && c <= 'Z') return c - 'A';
+    return c - 'a' + 26;
 }
 
-// Convert an integer to character
-char valueToChar(int val) {
-    if (val >= 0 && val <= 9) return '0' + val;
-    if (val >= 10 && val <= 35) return 'A' + val - 10;
-    return '0';
-}
-
-// Integer Addition using School Method
-string add(string num1, string num2, int base) {
-    int carry = 0;
-    string result = "";
-
-    while (!num1.empty() || !num2.empty() || carry) {
-        int x = !num1.empty() ? charToValue(num1.back()) : 0;
-        int y = !num2.empty() ? charToValue(num2.back()) : 0;
-
-        int sum = x + y + carry;
-        carry = sum / base;
-        result.push_back(valueToChar(sum % base));
-
-        if (!num1.empty()) num1.pop_back();
-        if (!num2.empty()) num2.pop_back();
+vector<string> splitLine(const string& line) {
+    vector<string> result;
+    stringstream ss(line);
+    string token;
+    while (getline(ss, token, ',')) {
+        result.push_back(token);
     }
-
-    reverse(result.begin(), result.end());
     return result;
 }
 
-// Integer Multiplication using simple digit-by-digit method
-string multiply(string num1, string num2, int base) {
-    int n = num1.size();
-    int m = num2.size();
-
-    if (n == 0 || m == 0) return "0";
-
-    // Convert characters to integer values
-    for (int i = 0; i < n; i++) num1[i] = charToValue(num1[i]);
-    for (int i = 0; i < m; i++) num2[i] = charToValue(num2[i]);
-
-    vector<int> result(n + m, 0);
-
-    for (int i = n - 1; i >= 0; i--) {
-        for (int j = m - 1; j >= 0; j--) {
-            int mul = num1[i] * num2[j];
-            int pos1 = i + j, pos2 = i + j + 1;
-            int sum = mul + result[pos2];
-
-            result[pos1] += sum / base;
-            result[pos2] = sum % base;
-        }
-    }
-
-    string res = "";
-    for (int i = 0; i < n + m; i++) {
-        if (!(res.empty() && result[i] == 0)) {
-            res += valueToChar(result[i]);
-        }
-    }
-
-    return res.empty() ? "0" : res;
-}
-
 int main() {
-    string num1, num2;
-    int base;
+    string countryLine, buildLine, destroyLine;
+    getline(cin, countryLine);
+    getline(cin, buildLine);
+    getline(cin, destroyLine);
 
-    cin >> num1 >> num2 >> base;
+    vector<string> countryRows = splitLine(countryLine);
+    vector<string> buildRows = splitLine(buildLine);
+    vector<string> destroyRows = splitLine(destroyLine);
 
-    string sum_result = add(num1, num2, base);
-    string mul_result = multiply(num1, num2, base);
+    int n = countryRows.size();
 
-    cout << sum_result << " " << mul_result << endl;
+    vector<vector<int>> dist(n, vector<int>(n, INF));
+    vector<vector<int>> build(n, vector<int>(n, INF));
+    vector<vector<int>> destroy(n, vector<int>(n, INF));
 
+    // Parse the country graph
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (countryRows[i][j] == '1') {
+                dist[i][j] = 0; // Already connected, no cost
+            }
+        }
+    }
+
+    // Parse build and destroy costs
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            build[i][j] = charToCost(buildRows[i][j]);
+            destroy[i][j] = charToCost(destroyRows[i][j]);
+        }
+    }
+
+    // Floyd-Warshall
+    for (int k = 0; k < n; ++k)
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                if (dist[i][k] != INF && dist[k][j] != INF)
+                    dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
+
+    // Build minimum spanning connections
+    int totalCost = 0;
+    vector<vector<bool>> used(n, vector<bool>(n, false));
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (countryRows[i][j] == '1') {
+                if (dist[i][j] != 0) {
+                    totalCost += destroy[i][j]; // Destroy unnecessary connection
+                }
+            } else {
+                if (dist[i][j] == INF) {
+                    totalCost += build[i][j]; // Need to build a connection
+                }
+            }
+        }
+    }
+
+    cout << totalCost << endl;
     return 0;
 }

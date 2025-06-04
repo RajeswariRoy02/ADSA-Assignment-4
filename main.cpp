@@ -1,86 +1,126 @@
 #include <iostream>
 #include <vector>
-#include <limits>
+#include <algorithm>
 #include <string>
-#include <sstream>
+#include <limits>
 
 using namespace std;
 
 const int INF = numeric_limits<int>::max();
 
+// Convert char to cost
 int charToCost(char c) {
     if ('A' <= c && c <= 'Z') return c - 'A';
     return c - 'a' + 26;
 }
 
-vector<string> splitLine(const string& line) {
-    vector<string> result;
-    stringstream ss(line);
-    string token;
-    while (getline(ss, token, ',')) {
-        result.push_back(token);
+// Disjoint Set Union-Find
+class UnionFind {
+public:
+    vector<int> parent;
+    UnionFind(int n) {
+        parent.resize(n);
+        for (int i = 0; i < n; ++i)
+            parent[i] = i;
     }
-    return result;
-}
+    int find(int x) {
+        if (parent[x] != x) parent[x] = find(parent[x]);
+        return parent[x];
+    }
+    bool unite(int x, int y) {
+        int px = find(x), py = find(y);
+        if (px == py) return false;
+        parent[py] = px;
+        return true;
+    }
+};
+
+// Edge structure
+struct Edge {
+    int u, v, cost;
+    bool exists; // true = existing edge (destruction), false = new edge (construction)
+};
 
 int main() {
-    string countryLine, buildLine, destroyLine;
-    getline(cin, countryLine);
-    getline(cin, buildLine);
-    getline(cin, destroyLine);
+    string countryStr, buildStr, destroyStr;
+    getline(cin, countryStr);
+    getline(cin, buildStr);
+    getline(cin, destroyStr);
 
-    vector<string> countryRows = splitLine(countryLine);
-    vector<string> buildRows = splitLine(buildLine);
-    vector<string> destroyRows = splitLine(destroyLine);
+    // Parse input
+    vector<string> countryRows, buildRows, destroyRows;
+    int pos = 0, n = 0;
 
-    int n = countryRows.size();
-
-    vector<vector<int>> dist(n, vector<int>(n, INF));
-    vector<vector<int>> build(n, vector<int>(n, INF));
-    vector<vector<int>> destroy(n, vector<int>(n, INF));
-
-    // Parse the country graph
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (countryRows[i][j] == '1') {
-                dist[i][j] = 0; // Already connected, no cost
+    auto split = [](const string& s, char delim) {
+        vector<string> result;
+        string part;
+        for (char c : s) {
+            if (c == delim) {
+                result.push_back(part);
+                part.clear();
+            } else {
+                part += c;
             }
         }
-    }
+        result.push_back(part);
+        return result;
+    };
 
-    // Parse build and destroy costs
-    for (int i = 0; i < n; ++i) {
+    countryRows = split(countryStr, ',');
+    buildRows = split(buildStr, ',');
+    destroyRows = split(destroyStr, ',');
+
+    n = countryRows.size();
+    vector<vector<int>> country(n, vector<int>(n));
+    vector<vector<int>> build(n, vector<int>(n));
+    vector<vector<int>> destroy(n, vector<int>(n));
+
+    for (int i = 0; i < n; ++i)
         for (int j = 0; j < n; ++j) {
+            country[i][j] = countryRows[i][j] - '0';
             build[i][j] = charToCost(buildRows[i][j]);
             destroy[i][j] = charToCost(destroyRows[i][j]);
         }
-    }
 
-    // Floyd-Warshall
-    for (int k = 0; k < n; ++k)
-        for (int i = 0; i < n; ++i)
-            for (int j = 0; j < n; ++j)
-                if (dist[i][k] != INF && dist[k][j] != INF)
-                    dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]);
+    // Prepare edge list
+    vector<Edge> edges;
+    int totalDestroyCost = 0;
 
-    // Build minimum spanning connections
-    int totalCost = 0;
-    vector<vector<bool>> used(n, vector<bool>(n, false));
-
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
         for (int j = i + 1; j < n; ++j) {
-            if (countryRows[i][j] == '1') {
-                if (dist[i][j] != 0) {
-                    totalCost += destroy[i][j]; // Destroy unnecessary connection
-                }
+            if (country[i][j] == 1) {
+                // Existing edge: can destroy
+                edges.push_back({i, j, destroy[i][j], true});
+                totalDestroyCost += destroy[i][j];
             } else {
-                if (dist[i][j] == INF) {
-                    totalCost += build[i][j]; // Need to build a connection
-                }
+                // Potential new edge
+                edges.push_back({i, j, build[i][j], false});
+            }
+        }
+
+    // Sort edges: cheaper cost first
+    sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+        return a.cost < b.cost;
+    });
+
+    UnionFind uf(n);
+    int savedCost = 0;
+
+    for (const Edge& e : edges) {
+        if (uf.unite(e.u, e.v)) {
+            // If they were not connected, we must keep this edge
+            if (e.exists) {
+                // If it existed, don't destroy — we saved the cost
+                savedCost += e.cost;
+            } else {
+                // If it's a build, we must pay the cost
+                totalDestroyCost += e.cost;
             }
         }
     }
 
-    cout << totalCost << endl;
+    int result = totalDestroyCost - savedCost;
+    cout << result << endl;
+
     return 0;
 }

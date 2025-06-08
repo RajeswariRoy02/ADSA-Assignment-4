@@ -30,12 +30,10 @@ public:
         parent.resize(n);
         for (int i = 0; i < n; ++i) parent[i] = i;
     }
-
     int find(int x) {
         if (parent[x] != x) parent[x] = find(parent[x]);
         return parent[x];
     }
-
     bool unite(int x, int y) {
         int px = find(x), py = find(y);
         if (px == py) return false;
@@ -52,6 +50,7 @@ struct Edge {
 int main() {
     string line;
     getline(cin, line);
+
     vector<string> parts = split(line, ' ');
     vector<string> countryRaw = split(parts[0], ',');
     vector<string> buildRaw = split(parts[1], ',');
@@ -72,12 +71,10 @@ int main() {
             destroy[i][j] = charToCost(destroyRaw[i][j]);
         }
 
-    // Add edges
     for (int i = 0; i < n; ++i)
         for (int j = i + 1; j < n; ++j) {
             if (country[i][j]) {
                 totalDestroyCost += destroy[i][j];
-                // Edge exists: if we use it, we save destroy[i][j]
                 edges.push_back({i, j, -destroy[i][j], true});
             } else {
                 edges.push_back({i, j, build[i][j], false});
